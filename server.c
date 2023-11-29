@@ -317,6 +317,49 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
 
         if (quiche_conn_is_established(conn_io->conn)) {
             uint64_t s = 0;
+            quiche_stream_iter *readable = quiche_conn_readable(conn_io->conn);
+    
+            while (quiche_stream_iter_next(readable, &s)) {
+                fprintf(stderr, "stream %" PRIu64 " is readable\n", s);
+    
+                bool fin = false;
+                ssize_t recv_len = quiche_conn_stream_recv(conn_io->conn, s, buf, sizeof(buf), &fin);
+    
+                if (recv_len < 0) {
+                    break;
+                }
+    
+                // 检查是否是视频数据流（例如，流ID为4）
+                if (s == 4) {
+                    // 处理视频数据流
+                    FILE *video_file = fopen("received_video.mp4", "ab");
+                    if (video_file == NULL) {
+                        perror("failed to open video file");
+                        continue;
+                    }
+    
+                    if (fwrite(buf, 1, recv_len, video_file) != recv_len) {
+                        perror("failed to write video data to file");
+                        fclose(video_file);
+                        continue;
+                    }
+    
+                    fclose(video_file);
+    
+                    if (fin) {
+                        // 这是视频流的最后一个数据块
+                        printf("Video stream is complete.\n");
+                    }
+                }
+    
+                printf("recv: %.*s", (int)recv_len, buf);
+            }
+    
+            quiche_stream_iter_free(readable);
+        }
+
+        if (quiche_conn_is_established(conn_io->conn)) {
+            uint64_t s = 0;
 
             quiche_stream_iter *readable = quiche_conn_readable(conn_io->conn);
 

@@ -65,7 +65,7 @@ static void send_video_with_dtp(quiche_conn *conn, FILE *video_file, size_t stre
             fprintf(stderr, "quic连接失败\n");
         }
         if(quiche_conn_is_established(conn)){
-            
+            ssize_t sent = quiche_conn_stream_send_full(conn, stream_id, buffer, bytes_read, end_of_file, deadline, priority, depend_block);
         }
             
         if (sent < 0) {

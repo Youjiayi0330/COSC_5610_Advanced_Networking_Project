@@ -329,8 +329,8 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                     break;
                 }
     
-                // 检查是否是视频数据流（例如，流ID为4）
-                if (s == 4) {
+                // 检查是否是视频数据流（例如，流ID为5）
+                if (s == 5) {
                     // 处理视频数据流
                     FILE *video_file = fopen("received_video.mp4", "ab");
                     if (video_file == NULL) {

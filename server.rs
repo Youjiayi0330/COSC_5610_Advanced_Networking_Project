@@ -11,6 +11,7 @@ use ring::rand::*;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
+// if file is larger than 5M, it is seen as one large file
 const SOME_MAX_SIZE: u64 = 5 * 1024 * 1024;
 
 const USAGE: &str = "Usage:
@@ -375,7 +376,7 @@ fn main() {
         // them on the UDP socket, until quiche reports that there are no more
         // packets to be sent.
         for (peer, client) in clients.values_mut() {
-            let mut total_written_bytes: usize = 0; // 声明一个变量来存储累计写入的字节数
+            let mut total_written_bytes: usize = 0; // record total written bytes
 
             loop {
                 let write = match client.conn.send(&mut out) {
@@ -512,22 +513,23 @@ fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8], root: &str) {
             stream_id
         );
 
-        // 获取文件的元数据以检查其大小。
+        // Get the metadata of the file to check its size
         let metadata = std::fs::metadata(&path).unwrap();
-        // 检查文件是否大于某个预设的大小阈值。
-        // 如果是大文件，我们将采取不同的读取和发送策略。
-        if metadata.len() > SOME_MAX_SIZE { // SOME_MAX_SIZE 是你设定的大小阈值
-            info!("开始读取大文件");
-            // 打开文件准备读取。
+        // Checks if the file is larger than SOME_MAX_SIZE
+        // If it is a large file, use largeFileReponse to read file
+        if metadata.len() > SOME_MAX_SIZE { 
+            info!("Start reading big file data");
+            // Open the file ready to read
             let file = std::fs::File::open(&path).unwrap();
 
-            // 创建一个LargeFileResponse实例，用于跟踪文件的读取状态。
+            // Create a LargeFileResponse instance to track the read status of a file
             let large_file_response = LargeFileResponse { file, offset: 0 };
 
-            // 将这个LargeFileResponse实例与当前的流ID相关联，存储在client中。
+            // Associate this LargeFileResponse instance with the current stream ID to be stored in client
             client.large_file_responses.insert(stream_id, large_file_response);
         } else {
-            // 如果文件不是大文件，按原来的方式处理（即一次性读取整个文件内容）。
+            // If the file is not a large file, 
+            //process it as the original example (i.e., read the entire contents of the file at once)
             let body = std::fs::read(path.as_path())
             .unwrap_or_else(|_| b"Not Found!\r\n".to_vec());
 
@@ -560,17 +562,14 @@ fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8], root: &str) {
 
 /// Handles newly writable streams.
 fn handle_writable(client: &mut Client, stream_id: u64) {
-    info!(
-        "handle_writable函数被调用"
-    );
     let conn = &mut client.conn;
 
     debug!("{} stream {} is writable", conn.trace_id(), stream_id);
 
-    // 首先，处理部分响应（如果存在）。
+    // process the partial response (if present)
     if let Some(resp) = client.partial_responses.get_mut(&stream_id) {
         info!(
-            "开始处理部分响应_writable "
+            "Start processing the partial response "
         );
         let body = &resp.body[resp.written..];
 
@@ -585,46 +584,46 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
 
         resp.written += written;
 
-        // 如果已发送全部数据，则从映射中移除该响应。
+        // If all data has been sent, remove the response from the mapping.
         if resp.written == resp.body.len() {
             client.partial_responses.remove(&stream_id);
         }
     }
 
-    // 接下来，处理大文件响应（如果存在）。
+    // process the large file response (if it exists).
     if let Some(large_file_response) = client.large_file_responses.get_mut(&stream_id) {
         info!(
-            "开始处理大文件响应_writable {}"
+            ""
         );
-        let mut buffer = [0; 65535]; // 使用固定大小的缓冲区。
+        let mut buffer = [0; 65535]; // Use a fixed size buffer
 
         match large_file_response.file.read(&mut buffer) {
             Ok(0) => {
-                // 文件读取完毕，可以从映射中移除。
+                // The file is read and can be removed from the mapping
                 client.large_file_responses.remove(&stream_id);
             },
             Ok(nbytes) => {
-                info!("读取 {} bytes from the 大文件 for stream {}", nbytes, stream_id);
+                info!("read {} bytes from the file for stream {}", nbytes, stream_id);
                 if let Err(e) = client.conn.stream_send_full(stream_id, &buffer[..nbytes], false, 200, 1, 0) {
-                    error!("发送数据块到流失败 {}: {:?}", stream_id, e);
-                    // 发生错误时关闭流
+                    error!("send data block to stream fail {}: {:?}", stream_id, e);
+                    // Close stream when failed
                     if let Err(e) = client.conn.stream_shutdown(stream_id, quiche::Shutdown::Write, 0) {
-                        error!("关闭流失败 {}: {:?}", stream_id, e);
+                        error!("Close stream fail {}: {:?}", stream_id, e);
                     }
                     return;
                 }
-                // 更新已发送的数据量。
+                // Updates the amount of data that has been sent
                 large_file_response.offset += nbytes;
                 info!(
-                    "已发送数据量 {}",
+                    "data has been sent {} bytes",
                     large_file_response.offset
                 );
             },
             Err(e) => {
-                // 读取文件时出错，关闭流。
-                error!("读取文件失败 {}: {:?}", stream_id, e);
+                // Error while reading file, close stream
+                error!("read file fail {}: {:?}", stream_id, e);
                 if let Err(e) = client.conn.stream_shutdown(stream_id, quiche::Shutdown::Write, 0) {
-                    error!("关闭文件流失败 {}: {:?}", stream_id, e);
+                    error!("close file stream fail {}: {:?}", stream_id, e);
                 }
             },
         }

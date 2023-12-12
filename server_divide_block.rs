@@ -11,8 +11,8 @@ use ring::rand::*;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
-// if file is larger than 5M, it is seen as one large file
-const SOME_MAX_SIZE: u64 = 5 * 1024 * 1024;
+// set block size
+const SOME_MAX_SIZE: u64 = 1 * 1024 * 1024;
 
 const USAGE: &str = "Usage:
   server [options]
@@ -592,7 +592,7 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
         info!(
             ""
         );
-        let mut buffer = [0; 65535]; // Use a fixed size buffer
+        let mut buffer = [0; 1000000]; // Each block has 1000000 bytes
 
         match large_file_response.file.read(&mut buffer) {
             Ok(0) => {
@@ -601,7 +601,8 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
             },
             Ok(nbytes) => {
                 info!("read {} bytes from the file for stream {}", nbytes, stream_id);
-                if let Err(e) = client.conn.stream_send_full(stream_id, &buffer[..nbytes], false, 200, 1, 0) {
+                info!("Number {} block wiht priority {} ", large_file_response.offset/1000000, (large_file_response.offset/1000000)%3);
+                if let Err(e) = client.conn.stream_send_full(stream_id, &buffer[..nbytes], false, 200, ((large_file_response.offset/1000000) as u64)%3, 0) {
                     error!("send data block to stream fail {}: {:?}", stream_id, e);
                     // Close stream when failed
                     if let Err(e) = client.conn.stream_shutdown(stream_id, quiche::Shutdown::Write, 0) {

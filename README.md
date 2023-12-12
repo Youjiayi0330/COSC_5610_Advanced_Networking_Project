@@ -1,5 +1,6 @@
 # COSC_5610_Advanced_Networking_Project
-Our project is to test and evaluate [DTP](https://github.com/STAR-Tsinghua/DTP).
+Our project is to test and evaluate [DTP](https://github.com/STAR-Tsinghua/DTP).<br>
+You can put `server.rs`,`client.rs`,`server_divide_block.rs` in [DTP/examples](https://github.com/STAR-Tsinghua/DTP/tree/main/examples).
 ## Files description
 ### demo.mp4
 This is one 6M video. It is used to be test. You can put it in [DTP/examples/root](https://github.com/STAR-Tsinghua/DTP/tree/main/examples/root)

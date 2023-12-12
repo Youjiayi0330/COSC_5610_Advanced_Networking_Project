@@ -256,12 +256,12 @@ fn main() {
         for s in conn.readable() {
             
             while let Ok((read, fin)) = conn.stream_recv(s, &mut buf) {
-                debug!("收到 {} bytes", read);
+                debug!("receive {} bytes", read);
 
                 let stream_buf = &buf[..read];
 
                 debug!(
-                    "数据流 {} 有 {} bytes (fin? {})",
+                    "stream {} has {} bytes (fin? {})",
                     s,
                     stream_buf.len(),
                     fin
@@ -275,24 +275,24 @@ fn main() {
                 // we got the full response. Close the connection.
                 if s == HTTP_REQ_STREAM_ID && fin {
                     info!(
-                        "原先数据处理response received in {:?}, closing...",
+                        "response received in {:?}, closing...",
                         req_start.elapsed()
                     );
 
                     conn.close(true, 0x00, b"kthxbye").unwrap();
                 } else {
                     info!(
-                        "大文件流处理数据 has {} bytes ",
+                        "big file receive {} bytes ",
                         stream_buf.len()
                     );
                     buffer_size += stream_buf.len();
                     info!(
-                        "累计大文件流处理数据 has {} bytes ",
+                        "big file total receive has {} bytes ",
                         buffer_size
                     );
-                    // 处理大文件流的数据。
+                    // handle large file data
                     if let Err(e) = handle_large_file_stream(s, &buf[..read], fin) {
-                        error!("处理大文件流数据失败: {:?}", e);
+                        error!("handle large file fail: {:?}", e);
                     }
                 }
                 
@@ -351,7 +351,7 @@ fn handle_large_file_stream(stream_id: u64, data: &[u8], fin: bool) -> std::io::
     file.write_all(data)?;
 
     if fin {
-        // 如果fin为true，表示这个流的数据已经接收完毕。
+        // if fin is true, stream finish receiving data
         println!("Stream {} completed, data written to {}", stream_id, file_path);
     }
 
